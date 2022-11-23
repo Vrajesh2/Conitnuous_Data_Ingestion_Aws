@@ -1,0 +1,62 @@
+use Data_Pipelining;
+
+CREATE OR REPLACE TABLE PATIENTS(
+PATIENTID INT,
+FIRST_NAME VARCHAR(100),
+CITY VARCHAR(100),
+REGISTATIONYEAR INT
+);
+
+CREATE OR REPLACE TABLE HEALTHCARE(
+Patientid VARCHAR(15),	
+gender CHAR(8),	
+age VARCHAR(5)	,
+hypertension CHAR(20),	
+heart_disease CHAR(20),	
+ever_married CHAR(30),	
+work_type VARCHAR(60),	
+Residence_type CHAR(30)	,
+avg_glucose_level VARCHAR(20),	
+bmi VARCHAR(20)	,
+smoking_status	VARCHAR(20),
+stroke CHAR(20)
+);
+
+--create storage integration
+CREATE OR REPLACE STORAGE integration s3_int
+TYPE = EXTERNAL_STAGE
+STORAGE_PROVIDER = S3
+ENABLED = TRUE
+STORAGE_AWS_ROLE_ARN ='arn:aws:iam::263192013948:role/AWS-snowflake'
+STORAGE_ALLOWED_LOCATIONS =('s3://awshealthcarebuck');
+
+desc integration s3_int;
+
+--create stage
+CREATE OR REPLACE STAGE VS_HEALTHCARE_SP
+URL ='s3://awshealthcarebuck'
+file_format=CSV
+storage_integration = s3_int;
+
+LIST @VS_HEALTHCARE_SP;
+
+SHOW STAGES;
+
+--CREATE SNOWPIPE THAT RECOGNISES CSV THAT ARE INGESTED FROM EXTERNAL STAGE AND COPIES THE DATA INTO PATIENTS TABLE
+--The AUTO_INGEST=true parameter specifies to read event notifications sent from an S3 bucket to an SQS queue when new data is ready to load.
+
+
+CREATE OR REPLACE PIPE VS_HEALTHCARE_SNOWPIPE AUTO_INGEST = TRUE AS
+COPY INTO "DATA_PIPELINING"."PUBLIC"."HEALTHCARE"
+FROM @VS_HEALTHCARE_SP --stage name
+FILE_FORMAT = CSV;
+
+
+SHOW PIPES;
+
+SELECT count(*) FROM HEALTHCARE;
+
+select * from HEALTHCARE;
+alter pipe VS_HEALTHCARE_SNOWPIPE refresh; --to check if file is sent or not
+
+SELECT SYSTEM$PIPE_STATUS('VS_HEALTHCARE_SNOWPIPE'); --to check if file is pending or not
